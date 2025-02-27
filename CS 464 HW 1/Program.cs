@@ -13,7 +13,14 @@ namespace CS_464_HW_1
 
         public static void Main()
         {
-
+            try
+            {
+                SpaceObjectDataManager manager = new(XTrainPath, YTrainPath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
         }
     }
 }

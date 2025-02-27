@@ -10,17 +10,17 @@ namespace CS_464_HW_1
     public class SpaceObjectDataManager
     {
         public const int Feature_COUNT = 9;
-        public static readonly FeatureType[] FeatureTypes =
+        public static readonly EstimationType[] FeatureTypes =
         [
-            FeatureType.Categorical,    // redshift
-            FeatureType.Categorical,    // alpha
-            FeatureType.Categorical,    // delta
-            FeatureType.Continious,     // green_filter
-            FeatureType.Continious,     // near_infrared_filter
-            FeatureType.Categorical,    // cosmic_ray_activity
-            FeatureType.Continious,     // red_filter
-            FeatureType.Continious,     // ultraviolet_filter
-            FeatureType.Continious,     // infrared_filter
+            EstimationType.Categorical,    // redshift
+            EstimationType.Categorical,    // alpha
+            EstimationType.Categorical,    // delta
+            EstimationType.Continious,     // green_filter
+            EstimationType.Continious,     // near_infrared_filter
+            EstimationType.Categorical,    // cosmic_ray_activity
+            EstimationType.Continious,     // red_filter
+            EstimationType.Continious,     // ultraviolet_filter
+            EstimationType.Continious,     // infrared_filter
         ];
 
         public int EntryCount { get; private set; }
@@ -30,8 +30,13 @@ namespace CS_464_HW_1
 
         public SpaceObjectDataManager(string FeaturesPath, string outputPath)
         {
-            OutputData = CSVReader.ReadRows(outputPath, false).Select(n => n.Equals("True") ? 1 : 0).ToArray();
-            CSVData FeatureMatrix = CSVReader.ReadCSV(FeaturesPath, true);
+            CSVData FeatureMatrix;
+            try
+            {
+                OutputData = CSVReader.ReadRows(outputPath, false).Select(n => n.Equals("True") ? 1 : 0).ToArray();
+                FeatureMatrix = CSVReader.ReadCSV(FeaturesPath, true);
+            }
+            catch { throw; }
 
             Debug.Assert(OutputData.Length == FeatureMatrix.RowCount);
             EntryCount = OutputData.Length;
@@ -54,12 +59,12 @@ namespace CS_464_HW_1
 
             if(rowData.Length != Feature_COUNT)
             {
-                Console.WriteLine("The number of Features do not match.}");
+                Console.WriteLine("[WARNING] The number of Features do not match in (ConvertRowData)}");
                 return null;
             }
             if(rowData.Any(s => s.Length == 0))
             {
-                Console.WriteLine("Found an empty Feature.}");
+                Console.WriteLine("Found an empty Feature in (ConvertRowData)");
                 return null;
             }
 

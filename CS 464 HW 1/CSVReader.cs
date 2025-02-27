@@ -10,10 +10,27 @@ namespace CS_464_HW_1
     {
         public static CSVData ReadCSV(string csvFile, bool hasLabel = true)
         {
-            var data = File.ReadLines(csvFile).Skip(hasLabel ? 1 : 0).Select(line => line.Split(',')).ToArray();
-            return new(data);
+            try
+            {
+                string[][] data = File.ReadLines(csvFile).Skip(hasLabel ? 1 : 0).Select(line => line.Split(',')).ToArray();
+                return new CSVData(data);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"[ERROR] Cannot read the CSV file with the absolute path [{csvFile}] in (ReadCSV).", ex);
+            }
         }
-        public static string[] ReadRows(string csvFile, bool hasLabel = true) => File.ReadLines(csvFile).Skip(hasLabel ? 1 : 0).ToArray();
+        public static string[] ReadRows(string csvFile, bool hasLabel = true)
+        {
+            try
+            {
+                return File.ReadLines(csvFile).Skip(hasLabel ? 1 : 0).ToArray();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"[ERROR] Cannot read the CSV file with the absolute path [{csvFile}] in (ReadRows).", ex);
+            }
+        }
     }
 
     public class CSVData(string[][] data)
@@ -22,7 +39,6 @@ namespace CS_464_HW_1
         public readonly int ColCount = data[0].Length;
 
         private readonly string[][] Data = data;
-        public string this[int row, int col] => Data[row][col];
         public string[] GetRow(int row) => Data[row];
 
         public string[] GetCol(int col)
@@ -34,5 +50,7 @@ namespace CS_464_HW_1
             return Col;
         }
         public string[] GetCategories(int col) => GetCol(col).Distinct().Order().ToArray();
+
+        public static readonly CSVData Empty = new([]);
     }
 }
