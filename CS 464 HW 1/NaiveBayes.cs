@@ -15,9 +15,9 @@ namespace CS_464_HW_1
         Categorical,
         Continious
     }
-    public class Feature(int featureType, int[] data, EstimationType estimation)
+    public class Feature(int featureIndex, int[] data, EstimationType estimation)
     {
-        public readonly int Type = featureType; // ID, dictionary key
+        public readonly int Index = featureIndex; // ID, dictionary key
         public readonly int[] Data = data;
         public readonly EstimationType EstimationType = estimation;
     }
@@ -26,7 +26,7 @@ namespace CS_464_HW_1
         public readonly int[] Data = outputData;
         public readonly int[] UniqueCategories = outputData.Distinct().ToArray();
         public readonly Dictionary<int, double> LikelihoodSet =
-            outputData.GroupBy(o => o).ToDictionary(o => o.Key, o => Convert.ToDouble(o) / Convert.ToDouble(outputData.Length));
+            outputData.GroupBy(o => o).ToDictionary(o => o.Key, o => Convert.ToDouble(o.Count()) / Convert.ToDouble(outputData.Length));
     }
 
     public class NaiveBayes(int[] outputData)
@@ -47,9 +47,31 @@ namespace CS_464_HW_1
                 return;
             }
 
-            ILikelihoodEstimator Estimator = FeatureEstimators[Feature.Type] 
+            ILikelihoodEstimator Estimator = FeatureEstimators[Feature.Index] 
                 = Feature.EstimationType == EstimationType.Categorical ? new CategoricalEstimator() : new ContiniousEstimator();
             Estimator.EvaluateData(Feature.Data, Output);
+        }
+        public int? PredictFeature(int[] featureValues)
+        {
+            int? bestOutput = null;
+            double bestLogProbability = double.NegativeInfinity;
+
+            foreach (int outputType in Output.UniqueCategories)
+            {
+                double logProbability = Math.Log(Output.LikelihoodSet[outputType]);
+
+                for (int i = 0; i < featureValues.Length; i++)
+                {
+                    if (FeatureEstimators.TryGetValue(i, out ILikelihoodEstimator? estimator) && estimator != null)
+                        logProbability += estimator.GetProbability(featureValues[i], outputType);
+                }
+                if (logProbability > bestLogProbability)
+                {
+                    bestLogProbability = logProbability;
+                    bestOutput = outputType;
+                }
+            }
+            return bestOutput;
         }
     }
 
@@ -86,9 +108,10 @@ namespace CS_464_HW_1
             return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
         }
     }
-    public class ContiniousEstimator : ILikelihoodEstimator
+    public class ContiniousEstimator : ILikelihoodEstimator // works bad, check if its because its not normalized
     {
-        private readonly Dictionary<int, GaussianDistributionData> ContiniousLikelihoodMatrix = [];
+        private readonly Dictionary<int, GaussianDistributionData> ContinuousLikelihoodMatrix = [];
+
         public void EvaluateData(int[] featureData, Output output)
         {
             foreach (int outputType in output.UniqueCategories)
@@ -98,27 +121,40 @@ namespace CS_464_HW_1
                     .Select(Convert.ToDouble)
                     .ToArray();
 
-                double mean = featureValues.Average();
-                double variance = featureValues.Select(v => Math.Pow(v - mean, 2)).Average();
+                if (featureValues.Length == 0)
+                {
+                    ContinuousLikelihoodMatrix[outputType] = new GaussianDistributionData(0, 1); // Default values to avoid errors
+                    continue;
+                }
 
-                ContiniousLikelihoodMatrix[outputType] = new GaussianDistributionData(mean, variance);
+                double mean = featureValues.Average();
+                double variance = featureValues.Select(v => Math.Pow(v - mean, 2)).Sum() / Math.Max(featureValues.Length - 1, 1); // Bessel's correction
+
+                // Ensure variance is not zero to prevent division errors
+                variance = Math.Max(variance, 1e-6);
+
+                ContinuousLikelihoodMatrix[outputType] = new GaussianDistributionData(mean, variance);
             }
         }
+
         public double GetProbability(int featureValue, int outputValue)
         {
-            if (ContiniousLikelihoodMatrix.TryGetValue(outputValue, out var gaussian))
+            if (ContinuousLikelihoodMatrix.TryGetValue(outputValue, out var gaussian))
             {
-                double standartDeviation = Math.Sqrt(gaussian.Variance);
-                double exponent = -Math.Pow(featureValue - gaussian.Mean, 2) / (2 * gaussian.Variance);
-                return -Math.Log(standartDeviation * Math.Sqrt(2 * Math.PI)) + exponent;
+                double standardDeviation = Math.Sqrt(gaussian.Variance);
+                double exponent = -Math.Pow(Convert.ToDouble(featureValue) - gaussian.Mean, 2) / (2 * gaussian.Variance);
+                double probability = (1 / (standardDeviation * Math.Sqrt(2 * Math.PI))) * Math.Exp(exponent);
+                return Math.Log(Math.Max(probability, NaiveBayes.ALPHA_SMOOTHING_COFACTOR)); // Avoid log(0)
             }
             return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
         }
+
         private readonly struct GaussianDistributionData(double mean, double variance)
         {
             public readonly double Mean = mean;
             public readonly double Variance = variance;
         }
     }
-#endregion
+
+    #endregion
 }

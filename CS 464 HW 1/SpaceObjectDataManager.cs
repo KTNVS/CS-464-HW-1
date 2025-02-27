@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -7,9 +8,17 @@ using System.Threading.Tasks;
 
 namespace CS_464_HW_1
 {
+    public class DataXY
+    {
+        public int EntryCount;
+        public DataMatrix<int> FeatureData = DataMatrix<int>.Empty;
+        public int[] OutputData = [];
+    }
     public class SpaceObjectDataManager
     {
-        public const int Feature_COUNT = 9;
+        private readonly NaiveBayes NaiveBayes;
+
+        public const int FEATURE_COUNT = 9;
         public static readonly EstimationType[] FeatureTypes =
         [
             EstimationType.Categorical,    // redshift
@@ -23,78 +32,125 @@ namespace CS_464_HW_1
             EstimationType.Continious,     // infrared_filter
         ];
 
-        public int EntryCount { get; private set; }
-        public SpaceObjectData[] FeatureData { get; private set; }
-        public int[] OutputData {  get; private set; }
+        private readonly DataXY TrainData = new();
+        private readonly DataXY TestData = new();
 
-
-        public SpaceObjectDataManager(string FeaturesPath, string outputPath)
+        public SpaceObjectDataManager(string trainFeaturesPath, string trainOutputPath, string testFeaturesPath, string testOutputPath)
         {
-            CSVData FeatureMatrix;
             try
             {
-                OutputData = CSVReader.ReadRows(outputPath, false).Select(n => n.Equals("True") ? 1 : 0).ToArray();
+                TrainData = ExtractDataFromCSV(trainFeaturesPath, trainOutputPath);
+                TestData = ExtractDataFromCSV(testFeaturesPath, testOutputPath);
+            }
+            catch { throw; }
+            
+            // array of object features => array of feature arrays | not done for test data as single objects outputs are predicted
+            TrainData.FeatureData = TrainData.FeatureData.Transpose();
+            NaiveBayes = new(TrainData.OutputData);
+        }
+        public void Evaluate()
+        {
+            Console.WriteLine("Evaluation started.");
+            for (int i = 0; i < FEATURE_COUNT; i++)
+                NaiveBayes.LearnFeature(new Feature(i, TrainData.FeatureData.GetRow(i), FeatureTypes[i]));
+            Console.WriteLine("Evaluation completed.");
+        }
+        public void Predict()
+        {
+            Console.WriteLine("Prediction started.");
+            int truePositive = 0, trueNegative = 0, falsePositive = 0, falseNegative = 0;
+            for (int i = 0; i < TestData.EntryCount; i++)
+            {
+                int? predictedOutput = NaiveBayes.PredictFeature(TestData.FeatureData.GetRow(i));
+                if(predictedOutput == null)
+                {
+                    Console.WriteLine($"[Warning] Output couldn't be predicted for object index {i}. Skipping.");
+                    return;
+                }
+
+                if(TestData.OutputData[i] == predictedOutput)
+                {
+                    if (predictedOutput == 1)
+                        truePositive++;
+                    else
+                        trueNegative++;
+                }
+                else
+                {
+                    if (predictedOutput == 1)
+                        falsePositive++;
+                    else
+                        falseNegative++;
+                }
+            }
+            double total = Convert.ToDouble(truePositive + trueNegative + falsePositive + falseNegative);
+            Console.WriteLine($"True Positive: {(Convert.ToDouble(truePositive) / total) * 100d}%");
+            Console.WriteLine($"True Negative: {(Convert.ToDouble(trueNegative) / total) * 100d}%");
+            Console.WriteLine($"False Positive: {(Convert.ToDouble(falsePositive) / total) * 100d}%");
+            Console.WriteLine($"False Negative: {(Convert.ToDouble(falseNegative) / total) * 100d}%");
+        }
+
+        private static DataXY ExtractDataFromCSV(string FeaturesPath, string outputPath)
+        {
+            DataXY csvData = new();
+            DataMatrix<string> FeatureMatrix;
+            try
+            {
+                csvData.OutputData = CSVReader.ReadRows(outputPath, false).Select(n => n.Equals("True") ? 1 : 0).ToArray();
                 FeatureMatrix = CSVReader.ReadCSV(FeaturesPath, true);
             }
             catch { throw; }
 
-            Debug.Assert(OutputData.Length == FeatureMatrix.RowCount);
-            EntryCount = OutputData.Length;
+            if (csvData.OutputData.Length != FeatureMatrix.RowCount)
+                throw new Exception($"[ERROR] X data length: {FeatureMatrix.RowCount} and Y data length: {outputPath.Length} are not the same.");
+            if (FEATURE_COUNT != FeatureMatrix.ColCount)
+                throw new Exception($"[ERROR] X feature count: {FeatureMatrix.RowCount} is not equal to the number of expected features of: {outputPath.Length}");
 
-            FeatureData = new SpaceObjectData[EntryCount];
-            for (int row = 0; row < EntryCount; row++)
+            csvData.EntryCount = csvData.OutputData.Length;
+
+            int[][] objectFeatures = new int[FeatureMatrix.RowCount][];
+            for (int row = 0; row < csvData.EntryCount; row++)
             {
-                SpaceObjectData? rowData = ConvertRowData(FeatureMatrix.GetRow(row));
-                if(rowData == null)
+                int[] rowData = ConvertRowData(FeatureMatrix.GetRow(row));
+                if (rowData.Length == 0)
                 {
                     Console.WriteLine($"Skipping row {row}.");
                     continue;
                 }
-                FeatureData[row] = rowData;
+                objectFeatures[row] = rowData;
             }
+            csvData.FeatureData = new DataMatrix<int>(objectFeatures);
+            return csvData;
         }
-        private static SpaceObjectData? ConvertRowData(string[] rowData)
+        private static int[] ConvertRowData(string[] rowData)
         {
             const int INT_LABEL_LENGTH = 2;
 
-            if(rowData.Length != Feature_COUNT)
+            if(rowData.Length != FEATURE_COUNT)
             {
                 Console.WriteLine("[WARNING] The number of Features do not match in (ConvertRowData)}");
-                return null;
+                return [];
             }
             if(rowData.Any(s => s.Length == 0))
             {
-                Console.WriteLine("Found an empty Feature in (ConvertRowData)");
-                return null;
+                Console.WriteLine("[WARNING] Found an empty Feature in (ConvertRowData)");
+                return [];
             }
 
-            return new SpaceObjectData
-            {
-                redshift = RedshiftRV[rowData[0]],
-                alpha = AlphaRV[rowData[1]],
-                delta = DeltaRV[rowData[2]],
-                green_filter = ExtractNumber(rowData[3]),
-                near_infrared_filter = ExtractNumber(rowData[4]),
-                cosmic_ray_activity = CosmicRayActivityRV[rowData[5]],
-                red_filter = ExtractNumber(rowData[6]),
-                ultraviolet_filter = ExtractNumber(rowData[7]),
-                infrared_filter = ExtractNumber(rowData[8])
-            };
+            return
+            [
+                RedshiftRV[rowData[0]],
+                AlphaRV[rowData[1]],
+                DeltaRV[rowData[2]],
+                ExtractNumber(rowData[3]),
+                ExtractNumber(rowData[4]),
+                CosmicRayActivityRV[rowData[5]],
+                ExtractNumber(rowData[6]),
+                ExtractNumber(rowData[7]),
+                ExtractNumber(rowData[8])
+            ];
 
             static int ExtractNumber(string number) => int.Parse(number[INT_LABEL_LENGTH..]);
-        }
-
-        public record SpaceObjectData
-        {
-            public required int redshift { get; init; }
-            public required int alpha { get; init; }
-            public required int delta { get; init; }
-            public required int green_filter { get; init; }
-            public required int near_infrared_filter { get; init; }
-            public required int cosmic_ray_activity { get; init; }
-            public required int red_filter { get; init; }
-            public required int ultraviolet_filter { get; init; }
-            public required int infrared_filter { get; init; }
         }
 
         public static readonly Dictionary<string, int> RedshiftRV = new()

@@ -8,12 +8,12 @@ namespace CS_464_HW_1
 {
     public static class CSVReader
     {
-        public static CSVData ReadCSV(string csvFile, bool hasLabel = true)
+        public static DataMatrix<string> ReadCSV(string csvFile, bool hasLabel = true)
         {
             try
             {
                 string[][] data = File.ReadLines(csvFile).Skip(hasLabel ? 1 : 0).Select(line => line.Split(',')).ToArray();
-                return new CSVData(data);
+                return new DataMatrix<string>(data);
             }
             catch (Exception ex)
             {
@@ -33,24 +33,34 @@ namespace CS_464_HW_1
         }
     }
 
-    public class CSVData(string[][] data)
+    public class DataMatrix<T>(T[][] data)
     {
         public readonly int RowCount = data.Length;
-        public readonly int ColCount = data[0].Length;
+        public readonly int ColCount = data.Length == 0 ? 0 : data[0].Length;
 
-        private readonly string[][] Data = data;
-        public string[] GetRow(int row) => Data[row];
-
-        public string[] GetCol(int col)
+        private readonly T[][] Data = data;
+        public T[] GetRow(int row) => Data[row];
+        public T[] GetCol(int col)
         {
-            string[] Col = new string[RowCount];
+            T[] Col = new T[RowCount];
             for (int row = 0; row < RowCount; row++)
                 Col[row] = Data[row][col];
-
             return Col;
         }
-        public string[] GetCategories(int col) => GetCol(col).Distinct().Order().ToArray();
+        public DataMatrix<T> Transpose()
+        {
+            if (RowCount == 0 || ColCount == 0)
+                return DataMatrix<T>.Empty;
 
-        public static readonly CSVData Empty = new([]);
+            T[][] transposed = new T[ColCount][];
+            for (int col = 0; col < ColCount; col++)
+            {
+                transposed[col] = new T[RowCount];
+                for (int row = 0; row < RowCount; row++)
+                    transposed[col][row] = Data[row][col];
+            }
+            return new DataMatrix<T>(transposed);
+        }
+        public static readonly DataMatrix<T> Empty = new([]);
     }
 }
