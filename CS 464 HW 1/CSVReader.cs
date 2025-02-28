@@ -39,8 +39,14 @@ namespace CS_464_HW_1
         public readonly int ColCount = data.Length == 0 ? 0 : data[0].Length;
 
         private readonly T[][] Data = data;
+
+        public T this[int i, int j]
+        {
+            get => Data[i][j];
+            set => Data[i][j] = value;
+        }
         public T[] GetRow(int row) => Data[row];
-        public T[] GetCol(int col)
+        public T[] GetCol(int col) // todo: convert to enumaretor
         {
             T[] Col = new T[RowCount];
             for (int row = 0; row < RowCount; row++)

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+
 namespace CS_464_HW_1
 {
     public class DataXY
@@ -16,6 +17,9 @@ namespace CS_464_HW_1
     }
     public class SpaceObjectDataManager
     {
+        const int INT_LABEL_LENGTH = 2;
+        const int UNDOCUMENTED_VALUE_NUMBER = -9999; // will be replaced with mean value
+
         private readonly NaiveBayes NaiveBayes;
 
         public const int FEATURE_COUNT = 9;
@@ -43,12 +47,15 @@ namespace CS_464_HW_1
                 TestData = ExtractDataFromCSV(testFeaturesPath, testOutputPath);
             }
             catch { throw; }
-            
+
+            RemoveUndocumentedValues(TrainData.FeatureData);
+            RemoveUndocumentedValues(TestData.FeatureData);
+
             // array of object features => array of feature arrays | not done for test data as single objects outputs are predicted
             TrainData.FeatureData = TrainData.FeatureData.Transpose();
             NaiveBayes = new(TrainData.OutputData);
         }
-        public void Evaluate()
+        public void Fit()
         {
             Console.WriteLine("Evaluation started.");
             for (int i = 0; i < FEATURE_COUNT; i++)
@@ -89,7 +96,19 @@ namespace CS_464_HW_1
             Console.WriteLine($"False Positive: {(Convert.ToDouble(falsePositive) / total) * 100d}%");
             Console.WriteLine($"False Negative: {(Convert.ToDouble(falseNegative) / total) * 100d}%");
         }
-
+        private static void RemoveUndocumentedValues(DataMatrix<int> data)
+        {
+            for (int featureIndex = 0; featureIndex < FEATURE_COUNT; featureIndex++)
+            {
+                if (FeatureTypes[featureIndex] == EstimationType.Continious)
+                {
+                    int average = Convert.ToInt32(data.GetCol(featureIndex).Average());
+                    for (int row = 0; row < data.RowCount; row++)
+                        if (data[row, featureIndex] == UNDOCUMENTED_VALUE_NUMBER)
+                            data[row, featureIndex] = average;
+                }
+            }
+        }
         private static DataXY ExtractDataFromCSV(string FeaturesPath, string outputPath)
         {
             DataXY csvData = new();
@@ -124,8 +143,6 @@ namespace CS_464_HW_1
         }
         private static int[] ConvertRowData(string[] rowData)
         {
-            const int INT_LABEL_LENGTH = 2;
-
             if(rowData.Length != FEATURE_COUNT)
             {
                 Console.WriteLine("[WARNING] The number of Features do not match in (ConvertRowData)}");

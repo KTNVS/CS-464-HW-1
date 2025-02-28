@@ -46,7 +46,6 @@ namespace CS_464_HW_1
                     $"Feature entry count: {Feature.Data.Length} is not equal to output entry count: {EntryCount} in (AddFeature)");
                 return;
             }
-
             ILikelihoodEstimator Estimator = FeatureEstimators[Feature.Index] 
                 = Feature.EstimationType == EstimationType.Categorical ? new CategoricalEstimator() : new ContiniousEstimator();
             Estimator.EvaluateData(Feature.Data, Output);
@@ -108,7 +107,7 @@ namespace CS_464_HW_1
             return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
         }
     }
-    public class ContiniousEstimator : ILikelihoodEstimator // works bad, check if its because its not normalized
+    public class ContiniousEstimator : ILikelihoodEstimator
     {
         private readonly Dictionary<int, GaussianDistributionData> ContinuousLikelihoodMatrix = [];
 
@@ -123,15 +122,16 @@ namespace CS_464_HW_1
 
                 if (featureValues.Length == 0)
                 {
-                    ContinuousLikelihoodMatrix[outputType] = new GaussianDistributionData(0, 1); // Default values to avoid errors
+                    ContinuousLikelihoodMatrix[outputType] = GaussianDistributionData.Default;
                     continue;
                 }
 
                 double mean = featureValues.Average();
-                double variance = featureValues.Select(v => Math.Pow(v - mean, 2)).Sum() / Math.Max(featureValues.Length - 1, 1); // Bessel's correction
+                double variance = featureValues.Select(v => Math.Pow((double)v - mean, 2d)).Sum() / Math.Max(featureValues.Length - 1, 1d);
 
-                // Ensure variance is not zero to prevent division errors
-                variance = Math.Max(variance, 1e-6);
+                Console.WriteLine($"Output: {outputType}, Mean: {mean}, Variance: {variance}, Min: {featureValues.Min()}, Max: {featureValues.Max()}");
+
+                variance = Math.Max(variance, NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
 
                 ContinuousLikelihoodMatrix[outputType] = new GaussianDistributionData(mean, variance);
             }
@@ -143,7 +143,7 @@ namespace CS_464_HW_1
             {
                 double standardDeviation = Math.Sqrt(gaussian.Variance);
                 double exponent = -Math.Pow(Convert.ToDouble(featureValue) - gaussian.Mean, 2) / (2 * gaussian.Variance);
-                double probability = (1 / (standardDeviation * Math.Sqrt(2 * Math.PI))) * Math.Exp(exponent);
+                double probability = 1 / (standardDeviation * Math.Sqrt(2 * Math.PI)) * Math.Exp(exponent);
                 return Math.Log(Math.Max(probability, NaiveBayes.ALPHA_SMOOTHING_COFACTOR)); // Avoid log(0)
             }
             return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
@@ -153,6 +153,8 @@ namespace CS_464_HW_1
         {
             public readonly double Mean = mean;
             public readonly double Variance = variance;
+
+            public static GaussianDistributionData Default = new(0, 1);
         }
     }
 

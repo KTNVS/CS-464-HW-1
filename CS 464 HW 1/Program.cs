@@ -16,7 +16,7 @@ namespace CS_464_HW_1
             try
             {
                 SpaceObjectDataManager manager = new(XTrainPath, YTrainPath, XTestPath, YTestPath);
-                manager.Evaluate();
+                manager.Fit();
                 manager.Predict();
             }
             catch (Exception ex)
