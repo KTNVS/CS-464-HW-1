@@ -1,5 +1,7 @@
 ﻿
 
+using System.Collections.Frozen;
+
 namespace CS_464_HW_1
 {
     public class CS_464_HW_1
@@ -15,14 +17,14 @@ namespace CS_464_HW_1
         {
             try
             {
-                SpaceObjectDataManager manager = new(XTrainPath, YTrainPath, XTestPath, YTestPath);
-                manager.Fit();
-                manager.Predict();
+                SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath);
+                objectClassifier.GetMutualInformation();
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex.ToString());
             }
+            
         }
     }
 }

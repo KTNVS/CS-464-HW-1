@@ -13,7 +13,7 @@ namespace CS_464_HW_1
     public enum EstimationType : byte
     {
         Categorical,
-        Continious
+        Gaussian
     }
     public class Feature(int featureIndex, int[] data, EstimationType estimation)
     {
@@ -31,12 +31,14 @@ namespace CS_464_HW_1
 
     public class NaiveBayes(int[] outputData)
     {
-        public const double ALPHA_SMOOTHING_COFACTOR = 1e-6;
+        public static readonly double ALPHA_SMOOTHING_COFACTOR = Math.Log(1e-6);
 
         private readonly int EntryCount = outputData.Length;
         private readonly Output Output = new(outputData);
 
         private readonly Dictionary<int, ILikelihoodEstimator> FeatureEstimators = [];
+        public void PrintFeatureEstimationInfo(int i) => FeatureEstimators[i].PrintInfo();
+        public void ResetEstimationData() => FeatureEstimators.Clear();
 
         public void LearnFeature(Feature Feature) // since bayes considers them independent, no problem learning seperately
         {
@@ -47,7 +49,7 @@ namespace CS_464_HW_1
                 return;
             }
             ILikelihoodEstimator Estimator = FeatureEstimators[Feature.Index] 
-                = Feature.EstimationType == EstimationType.Categorical ? new CategoricalEstimator() : new ContiniousEstimator();
+                = Feature.EstimationType == EstimationType.Categorical ? new CategoricalEstimator() : new GaussianEstimator();
             Estimator.EvaluateData(Feature.Data, Output);
         }
         public int? PredictFeature(int[] featureValues)
@@ -79,6 +81,7 @@ namespace CS_464_HW_1
     {
         public void EvaluateData(int[] featureData, Output output);
         public double GetProbability(int featureValue, int outputValue);
+        public void PrintInfo();
     }
     public class CategoricalEstimator : ILikelihoodEstimator
     {
@@ -102,12 +105,23 @@ namespace CS_464_HW_1
         public double GetProbability(int featureValue, int outputValue)
         {
             if (CategoricalLikelihoodMatrix.TryGetValue(outputValue, out var categoryLikelihoods) && categoryLikelihoods.TryGetValue(featureValue, out double probability))
-                return Math.Log(probability + NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
+                return Math.Log(probability);
 
-            return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
+            return NaiveBayes.ALPHA_SMOOTHING_COFACTOR;
+        }
+
+        public void PrintInfo()
+        {
+            foreach (var output in CategoricalLikelihoodMatrix)
+            {
+                Console.WriteLine($"Output category: {output.Key}");
+                foreach (var category in output.Value.OrderByDescending(f => f.Value))
+                    Console.WriteLine($"\tCategory [{category.Key}] probability: {category.Value:N6}");
+            }
         }
     }
-    public class ContiniousEstimator : ILikelihoodEstimator
+
+    public class GaussianEstimator : ILikelihoodEstimator
     {
         private readonly Dictionary<int, GaussianDistributionData> ContinuousLikelihoodMatrix = [];
 
@@ -129,10 +143,6 @@ namespace CS_464_HW_1
                 double mean = featureValues.Average();
                 double variance = featureValues.Select(v => Math.Pow((double)v - mean, 2d)).Sum() / Math.Max(featureValues.Length - 1, 1d);
 
-                Console.WriteLine($"Output: {outputType}, Mean: {mean}, Variance: {variance}, Min: {featureValues.Min()}, Max: {featureValues.Max()}");
-
-                variance = Math.Max(variance, NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
-
                 ContinuousLikelihoodMatrix[outputType] = new GaussianDistributionData(mean, variance);
             }
         }
@@ -141,12 +151,11 @@ namespace CS_464_HW_1
         {
             if (ContinuousLikelihoodMatrix.TryGetValue(outputValue, out var gaussian))
             {
-                double standardDeviation = Math.Sqrt(gaussian.Variance);
                 double exponent = -Math.Pow(Convert.ToDouble(featureValue) - gaussian.Mean, 2) / (2 * gaussian.Variance);
-                double probability = 1 / (standardDeviation * Math.Sqrt(2 * Math.PI)) * Math.Exp(exponent);
-                return Math.Log(Math.Max(probability, NaiveBayes.ALPHA_SMOOTHING_COFACTOR)); // Avoid log(0)
+                double probability = Math.Exp(exponent) / (Math.Sqrt(2 * Math.PI * gaussian.Variance));
+                return Math.Log(probability);
             }
-            return Math.Log(NaiveBayes.ALPHA_SMOOTHING_COFACTOR);
+            return NaiveBayes.ALPHA_SMOOTHING_COFACTOR;
         }
 
         private readonly struct GaussianDistributionData(double mean, double variance)
@@ -156,7 +165,13 @@ namespace CS_464_HW_1
 
             public static GaussianDistributionData Default = new(0, 1);
         }
+
+        public void PrintInfo()
+        {
+            Console.WriteLine("Continious info");
+        }
     }
+
 
     #endregion
 }

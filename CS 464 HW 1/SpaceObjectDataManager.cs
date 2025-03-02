@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,26 +22,29 @@ namespace CS_464_HW_1
         const int UNDOCUMENTED_VALUE_NUMBER = -9999; // will be replaced with mean value
 
         private readonly NaiveBayes NaiveBayes;
+        private bool FeatuesEvaluated = false;
+        private readonly bool SelectGrouped;
 
-        public const int FEATURE_COUNT = 9;
+        public const int FEATURE_COUNT_DEFAULT = 9;
         public static readonly EstimationType[] FeatureTypes =
         [
-            EstimationType.Categorical,    // redshift
-            EstimationType.Categorical,    // alpha
-            EstimationType.Categorical,    // delta
-            EstimationType.Continious,     // green_filter
-            EstimationType.Continious,     // near_infrared_filter
-            EstimationType.Categorical,    // cosmic_ray_activity
-            EstimationType.Continious,     // red_filter
-            EstimationType.Continious,     // ultraviolet_filter
-            EstimationType.Continious,     // infrared_filter
+            EstimationType.Categorical,     // redshift
+            EstimationType.Categorical,     // alpha
+            EstimationType.Categorical,     // delta
+            EstimationType.Gaussian,        // green_filter
+            EstimationType.Gaussian,        // near_infrared_filter
+            EstimationType.Categorical,     // cosmic_ray_activity
+            EstimationType.Gaussian,        // red_filter
+            EstimationType.Gaussian,        // ultraviolet_filter
+            EstimationType.Gaussian,        // infrared_filter
         ];
 
         private readonly DataXY TrainData = new();
         private readonly DataXY TestData = new();
 
-        public SpaceObjectDataManager(string trainFeaturesPath, string trainOutputPath, string testFeaturesPath, string testOutputPath)
+        public SpaceObjectDataManager(string trainFeaturesPath, string trainOutputPath, string testFeaturesPath, string testOutputPath, bool selectGrouped = false) 
         {
+            SelectGrouped = selectGrouped;
             try
             {
                 TrainData = ExtractDataFromCSV(trainFeaturesPath, trainOutputPath);
@@ -51,16 +55,26 @@ namespace CS_464_HW_1
             RemoveUndocumentedValues(TrainData.FeatureData);
             RemoveUndocumentedValues(TestData.FeatureData);
 
-            // array of object features => array of feature arrays | not done for test data as single objects outputs are predicted
+            // array of object features => array of feature arrays; not done for test data as single objects outputs are predicted
             TrainData.FeatureData = TrainData.FeatureData.Transpose();
             NaiveBayes = new(TrainData.OutputData);
         }
-        public void Fit()
+        public void ResetEvaluationData()
+        {
+            NaiveBayes.ResetEstimationData();
+            FeatuesEvaluated = false;
+        }
+        public void Evaluate(bool forceCategorical = false, int selectKMutuals = 0) // 0, select all, 1-9 select respectively, 
         {
             Console.WriteLine("Evaluation started.");
-            for (int i = 0; i < FEATURE_COUNT; i++)
-                NaiveBayes.LearnFeature(new Feature(i, TrainData.FeatureData.GetRow(i), FeatureTypes[i]));
+            if(selectKMutuals >= 1 && selectKMutuals <= FEATURE_COUNT_DEFAULT - 1)
+            {
+                //
+            }
+            for (int i = 0; i < TrainData.FeatureData.RowCount; i++)
+                NaiveBayes.LearnFeature(new Feature(i, TrainData.FeatureData.GetRow(i), forceCategorical ? EstimationType.Categorical : FeatureTypes[i]));
             Console.WriteLine("Evaluation completed.");
+            FeatuesEvaluated = true;
         }
         public void Predict()
         {
@@ -90,17 +104,43 @@ namespace CS_464_HW_1
                         falseNegative++;
                 }
             }
+            Console.WriteLine("Prediction completed.");
+
             double total = Convert.ToDouble(truePositive + trueNegative + falsePositive + falseNegative);
-            Console.WriteLine($"True Positive: {(Convert.ToDouble(truePositive) / total) * 100d}%");
-            Console.WriteLine($"True Negative: {(Convert.ToDouble(trueNegative) / total) * 100d}%");
-            Console.WriteLine($"False Positive: {(Convert.ToDouble(falsePositive) / total) * 100d}%");
-            Console.WriteLine($"False Negative: {(Convert.ToDouble(falseNegative) / total) * 100d}%");
+            Console.WriteLine();
+            Console.WriteLine($"Total accuracy: {Convert.ToDouble(truePositive + trueNegative) / total * 100d}%");
+            Console.WriteLine();
+            Console.WriteLine($"True Positive: {Convert.ToDouble(truePositive) / total * 100d}%");
+            Console.WriteLine($"True Negative: {Convert.ToDouble(trueNegative) / total * 100d}%");
+            Console.WriteLine($"False Positive: {Convert.ToDouble(falsePositive) / total * 100d}%");
+            Console.WriteLine($"False Negative: {Convert.ToDouble(falseNegative) / total * 100d}%");
         }
-        private static void RemoveUndocumentedValues(DataMatrix<int> data)
+        public void GetAllFeaturesCategoryCount()
         {
-            for (int featureIndex = 0; featureIndex < FEATURE_COUNT; featureIndex++)
+            Console.WriteLine($"Output category count: {TrainData.OutputData.Distinct().Count()}");
+            for (int i = 0; i < TrainData.FeatureData.RowCount; i++)
+                Console.WriteLine($"Feature [{FeatureNames[i]}] category count: {TrainData.FeatureData.GetRow(i).Distinct().Count()}");
+        }
+        public void GetFeatureProbabilities()
+        {
+            if (!FeatuesEvaluated)
             {
-                if (FeatureTypes[featureIndex] == EstimationType.Continious)
+                Console.WriteLine("Can't show feature probabilities, features are not evaluated.");
+                return;
+            }
+            for (int i = 0; i < TrainData.FeatureData.RowCount; i++)
+            {
+                Console.WriteLine($"\n\nFeature: {FeatureNames[i]}\n");
+                NaiveBayes.PrintFeatureEstimationInfo(i);
+            }
+        }
+        public void GetMutualInformation() => FeatureSelection.PrintMutualInformation(TrainData, FeatureNames);
+
+        private void RemoveUndocumentedValues(DataMatrix<int> data)
+        {
+            for (int featureIndex = 0; featureIndex < data.ColCount; featureIndex++)
+            {
+                if (FeatureTypes[featureIndex] == EstimationType.Gaussian)
                 {
                     int average = Convert.ToInt32(data.GetCol(featureIndex).Average());
                     for (int row = 0; row < data.RowCount; row++)
@@ -109,7 +149,7 @@ namespace CS_464_HW_1
                 }
             }
         }
-        private static DataXY ExtractDataFromCSV(string FeaturesPath, string outputPath)
+        private DataXY ExtractDataFromCSV(string FeaturesPath, string outputPath)
         {
             DataXY csvData = new();
             DataMatrix<string> FeatureMatrix;
@@ -122,7 +162,7 @@ namespace CS_464_HW_1
 
             if (csvData.OutputData.Length != FeatureMatrix.RowCount)
                 throw new Exception($"[ERROR] X data length: {FeatureMatrix.RowCount} and Y data length: {outputPath.Length} are not the same.");
-            if (FEATURE_COUNT != FeatureMatrix.ColCount)
+            if (FEATURE_COUNT_DEFAULT != FeatureMatrix.ColCount)
                 throw new Exception($"[ERROR] X feature count: {FeatureMatrix.RowCount} is not equal to the number of expected features of: {outputPath.Length}");
 
             csvData.EntryCount = csvData.OutputData.Length;
@@ -141,9 +181,9 @@ namespace CS_464_HW_1
             csvData.FeatureData = new DataMatrix<int>(objectFeatures);
             return csvData;
         }
-        private static int[] ConvertRowData(string[] rowData)
+        private int[] ConvertRowData(string[] rowData)
         {
-            if(rowData.Length != FEATURE_COUNT)
+            if(rowData.Length != FEATURE_COUNT_DEFAULT)
             {
                 Console.WriteLine("[WARNING] The number of Features do not match in (ConvertRowData)}");
                 return [];
@@ -152,6 +192,19 @@ namespace CS_464_HW_1
             {
                 Console.WriteLine("[WARNING] Found an empty Feature in (ConvertRowData)");
                 return [];
+            }
+
+            if(SelectGrouped)
+            {
+                return
+                [
+                    (RedshiftRV[rowData[0]], AlphaRV[rowData[1]], DeltaRV[rowData[2]], ExtractNumber(rowData[8])).GetHashCode(),
+                    ExtractNumber(rowData[3]),
+                    ExtractNumber(rowData[4]),
+                    CosmicRayActivityRV[rowData[5]],
+                    ExtractNumber(rowData[6]),
+                    ExtractNumber(rowData[7])
+                ];
             }
 
             return
@@ -169,6 +222,19 @@ namespace CS_464_HW_1
 
             static int ExtractNumber(string number) => int.Parse(number[INT_LABEL_LENGTH..]);
         }
+
+        public static readonly List<string> FeatureNames =
+        [
+            "redshift",
+            "alpha",
+            "delta",
+            "green filter",
+            "near infrared filter",
+            "cosmic ray activity",
+            "red filter",
+            "ultraviolet filter",
+            "infrared filter",
+        ];
 
         public static readonly Dictionary<string, int> RedshiftRV = new()
         {
