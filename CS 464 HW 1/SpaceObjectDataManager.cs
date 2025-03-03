@@ -1,14 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.SqlTypes;
-using System.Diagnostics;
-using System.Linq;
-using System.Runtime.InteropServices.Marshalling;
-using System.Text;
-using System.Threading.Tasks;
-
-
-namespace CS_464_HW_1
+﻿namespace CS_464_HW_1
 {
     public class DataXY
     {
@@ -66,6 +56,7 @@ namespace CS_464_HW_1
         {
             NaiveBayes.ResetEstimationData();
             FeatuesEvaluated = false;
+            Console.WriteLine("Evaluation data is reset.\n");
         }
         public void Evaluate(bool forceCategorical = false, int selectKMutuals = 0) // 0, select all, 1-9 select respectively, 
         {
@@ -73,25 +64,23 @@ namespace CS_464_HW_1
                 ? FeatureSelection.GetFeatureIndexesOrderedByMutualInformation(TrainData).Take(selectKMutuals).Select(f => f.FeatureIndex)
                 : Enumerable.Range(0, TrainData.FeatureData.RowCount);
 
-            Console.WriteLine("Evaluation started.");
+            Console.Write("Evaluation started...");
             foreach (var index in features)
-            {
-                Console.WriteLine($"\tLearning feature {FeatureNames[index]}");
                 NaiveBayes.LearnFeature(new Feature(index, TrainData.FeatureData.GetRow(index), forceCategorical ? EstimationType.Categorical : FeatureTypes[index]));
-            }
+
             Console.WriteLine("Evaluation completed.");
             FeatuesEvaluated = true;
         }
         public void Predict()
         {
-            Console.WriteLine("Prediction started.");
+            Console.Write("Prediction started...");
             int truePositive = 0, trueNegative = 0, falsePositive = 0, falseNegative = 0;
             for (int i = 0; i < TestData.EntryCount; i++)
             {
                 int? predictedOutput = NaiveBayes.PredictFeature(TestData.FeatureData.GetRow(i));
                 if(predictedOutput == null)
                 {
-                    Console.WriteLine($"[Warning] Output couldn't be predicted for object index {i}. Skipping.");
+                    Console.WriteLine($"\n[Warning] Output couldn't be predicted for object index {i}. Skipping.");
                     return;
                 }
 
@@ -144,6 +133,7 @@ namespace CS_464_HW_1
             Console.WriteLine("Mutual Information Values:");
             foreach (var (FeatureIndex, MutualInformationValue) in sortedFeatures)
                 Console.WriteLine($"Feature type => {FeatureNames[FeatureIndex]}: {MutualInformationValue:N10}");
+            Console.WriteLine();
         }
             
 
