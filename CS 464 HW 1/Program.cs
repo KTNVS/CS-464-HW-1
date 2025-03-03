@@ -17,8 +17,14 @@ namespace CS_464_HW_1
         {
             try
             {
-                SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath);
-                objectClassifier.GetMutualInformation();
+                SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath, true);
+                for (int k = objectClassifier.FeatureCount; k >= 1; k--)
+                {
+                    Console.WriteLine($"Selecting first k = {k} elements with the highest mutual information with the output.");
+                    objectClassifier.Evaluate(true, k);
+                    objectClassifier.Predict();
+                    objectClassifier.ResetEvaluationData();
+                }
             }
             catch (Exception ex)
             {

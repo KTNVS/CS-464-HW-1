@@ -8,49 +8,51 @@ namespace CS_464_HW_1
 {
     public static class FeatureSelection
     {
-        public static void PrintMutualInformation(DataXY data, List<string> featureNames)
+        public static List<(int FeatureIndex, double MutualInformationValue)> GetFeatureIndexesOrderedByMutualInformation(DataXY data)
         {
             int featureCount = data.FeatureData.RowCount;
-            List<(string FeatureName, double MutualInformationValue)> featureMiList = [];
+
+            List<(int FeatureIndex, double MutualInformationValue)> featureMutualInformationList = [];
 
             for (int i = 0; i < featureCount; i++)
             {
                 double mutualInformationValue = GetMutualInformation(data.FeatureData.GetRow(i), data.OutputData);
-                featureMiList.Add((featureNames[i], mutualInformationValue));
+                featureMutualInformationList.Add((i, mutualInformationValue));
             }
 
-            var sortedFeatures = featureMiList.OrderByDescending(f => f.MutualInformationValue).ToList();
-
-            Console.WriteLine("Mutual Information Values:");
-            foreach (var (FeatureName, MutualInformationValue) in sortedFeatures)
-                Console.WriteLine($"Feature type => {FeatureName}: {MutualInformationValue:N10}");
+            return [.. featureMutualInformationList.OrderByDescending(f => f.MutualInformationValue)];
         }
 
         private static double GetMutualInformation(int[] featureData, int[] outputData)
         {
             double mutualInformation = 0d;
-
             int entryCount = featureData.Length;
+            
+            var featureFreq = new Dictionary<int, int>();
+            var outputFreq = new Dictionary<int, int>();
+            var jointFreq = new Dictionary<(int, int), int>();
 
-            foreach (int f in featureData.Distinct())
+            for (int i = 0; i < entryCount; i++)
             {
-                foreach (int o in outputData.Distinct())
-                {
-                    // Calculate P(feature, output)
-                    double pFeatureOutput = featureData
-                        .Zip(outputData, (f, o) => (f, o))
-                        .Count(pair => pair.f == f && pair.o == o) / (double)entryCount;
+                int f = featureData[i];
+                int o = outputData[i];
 
-                    // Calculate P(feature) and P(output)
-                    double pFeature = featureData.Count(fv => fv == f) / (double)entryCount;
-                    double pOutput = outputData.Count(ov => ov == o) / (double)entryCount;
-
-                    // Update mutual information if pFeatureOutput > 0
-                    if (pFeatureOutput > 0)
-                        mutualInformation += pFeatureOutput * Math.Log2(pFeatureOutput / (pFeature * pOutput));
-                }
+                featureFreq[f] = featureFreq.GetValueOrDefault(f, 0) + 1;
+                outputFreq[o] = outputFreq.GetValueOrDefault(o, 0) + 1;
+                jointFreq[(f, o)] = jointFreq.GetValueOrDefault((f, o), 0) + 1;
             }
+
+            foreach (var ((f, o), jointCount) in jointFreq)
+            {
+                double pFeatureOutput = jointCount / (double)entryCount;
+                double pFeature = featureFreq[f] / (double)entryCount;
+                double pOutput = outputFreq[o] / (double)entryCount;
+
+                mutualInformation += pFeatureOutput * Math.Log2(pFeatureOutput / (pFeature * pOutput));
+            }
+
             return mutualInformation;
         }
+
     }
 }

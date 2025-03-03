@@ -25,7 +25,8 @@ namespace CS_464_HW_1
         private bool FeatuesEvaluated = false;
         private readonly bool SelectGrouped;
 
-        public const int FEATURE_COUNT_DEFAULT = 9;
+        public const int FEATURE_COUNT_DEFAULT = 9, FEATURE_COUNT_GROUPED = 6;
+        public readonly int FeatureCount;
         public static readonly EstimationType[] FeatureTypes =
         [
             EstimationType.Categorical,     // redshift
@@ -44,7 +45,9 @@ namespace CS_464_HW_1
 
         public SpaceObjectDataManager(string trainFeaturesPath, string trainOutputPath, string testFeaturesPath, string testOutputPath, bool selectGrouped = false) 
         {
+            FeatureCount = selectGrouped ? FEATURE_COUNT_GROUPED : FEATURE_COUNT_DEFAULT;
             SelectGrouped = selectGrouped;
+            
             try
             {
                 TrainData = ExtractDataFromCSV(trainFeaturesPath, trainOutputPath);
@@ -66,13 +69,16 @@ namespace CS_464_HW_1
         }
         public void Evaluate(bool forceCategorical = false, int selectKMutuals = 0) // 0, select all, 1-9 select respectively, 
         {
+            var features = (selectKMutuals >= 1 && selectKMutuals <= FeatureCount - 1)
+                ? FeatureSelection.GetFeatureIndexesOrderedByMutualInformation(TrainData).Take(selectKMutuals).Select(f => f.FeatureIndex)
+                : Enumerable.Range(0, TrainData.FeatureData.RowCount);
+
             Console.WriteLine("Evaluation started.");
-            if(selectKMutuals >= 1 && selectKMutuals <= FEATURE_COUNT_DEFAULT - 1)
+            foreach (var index in features)
             {
-                //
+                Console.WriteLine($"\tLearning feature {FeatureNames[index]}");
+                NaiveBayes.LearnFeature(new Feature(index, TrainData.FeatureData.GetRow(index), forceCategorical ? EstimationType.Categorical : FeatureTypes[index]));
             }
-            for (int i = 0; i < TrainData.FeatureData.RowCount; i++)
-                NaiveBayes.LearnFeature(new Feature(i, TrainData.FeatureData.GetRow(i), forceCategorical ? EstimationType.Categorical : FeatureTypes[i]));
             Console.WriteLine("Evaluation completed.");
             FeatuesEvaluated = true;
         }
@@ -107,13 +113,11 @@ namespace CS_464_HW_1
             Console.WriteLine("Prediction completed.");
 
             double total = Convert.ToDouble(truePositive + trueNegative + falsePositive + falseNegative);
-            Console.WriteLine();
-            Console.WriteLine($"Total accuracy: {Convert.ToDouble(truePositive + trueNegative) / total * 100d}%");
-            Console.WriteLine();
-            Console.WriteLine($"True Positive: {Convert.ToDouble(truePositive) / total * 100d}%");
+            Console.WriteLine($"\nTotal accuracy: {Convert.ToDouble(truePositive + trueNegative) / total * 100d}%");
+            Console.WriteLine($"\nTrue Positive: {Convert.ToDouble(truePositive) / total * 100d}%");
             Console.WriteLine($"True Negative: {Convert.ToDouble(trueNegative) / total * 100d}%");
             Console.WriteLine($"False Positive: {Convert.ToDouble(falsePositive) / total * 100d}%");
-            Console.WriteLine($"False Negative: {Convert.ToDouble(falseNegative) / total * 100d}%");
+            Console.WriteLine($"False Negative: {Convert.ToDouble(falseNegative) / total * 100d}%\n\n");
         }
         public void GetAllFeaturesCategoryCount()
         {
@@ -134,7 +138,14 @@ namespace CS_464_HW_1
                 NaiveBayes.PrintFeatureEstimationInfo(i);
             }
         }
-        public void GetMutualInformation() => FeatureSelection.PrintMutualInformation(TrainData, FeatureNames);
+        public void PrintMutualInformation() 
+        {
+            var sortedFeatures = FeatureSelection.GetFeatureIndexesOrderedByMutualInformation(TrainData);
+            Console.WriteLine("Mutual Information Values:");
+            foreach (var (FeatureIndex, MutualInformationValue) in sortedFeatures)
+                Console.WriteLine($"Feature type => {FeatureNames[FeatureIndex]}: {MutualInformationValue:N10}");
+        }
+            
 
         private void RemoveUndocumentedValues(DataMatrix<int> data)
         {
@@ -163,7 +174,7 @@ namespace CS_464_HW_1
             if (csvData.OutputData.Length != FeatureMatrix.RowCount)
                 throw new Exception($"[ERROR] X data length: {FeatureMatrix.RowCount} and Y data length: {outputPath.Length} are not the same.");
             if (FEATURE_COUNT_DEFAULT != FeatureMatrix.ColCount)
-                throw new Exception($"[ERROR] X feature count: {FeatureMatrix.RowCount} is not equal to the number of expected features of: {outputPath.Length}");
+                throw new Exception($"[ERROR] X feature count: {FeatureMatrix.ColCount} is not equal to the number of expected features of: {FEATURE_COUNT_DEFAULT}");
 
             csvData.EntryCount = csvData.OutputData.Length;
 
@@ -183,11 +194,6 @@ namespace CS_464_HW_1
         }
         private int[] ConvertRowData(string[] rowData)
         {
-            if(rowData.Length != FEATURE_COUNT_DEFAULT)
-            {
-                Console.WriteLine("[WARNING] The number of Features do not match in (ConvertRowData)}");
-                return [];
-            }
             if(rowData.Any(s => s.Length == 0))
             {
                 Console.WriteLine("[WARNING] Found an empty Feature in (ConvertRowData)");
