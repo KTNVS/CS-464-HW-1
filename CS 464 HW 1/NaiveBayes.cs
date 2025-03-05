@@ -110,7 +110,6 @@
             }
         }
     }
-
     public class GaussianEstimator : ILikelihoodEstimator
     {
         private readonly Dictionary<int, GaussianDistributionData> ContinuousLikelihoodMatrix = [];

@@ -9,7 +9,7 @@
     public class SpaceObjectDataManager
     {
         const int INT_LABEL_LENGTH = 2;
-        const int UNDOCUMENTED_VALUE_NUMBER = -9999; // will be replaced with mean value
+        const int UNDOCUMENTED_VALUE_NUMBER = -9999; // will be replaced with mean value if its continuous
 
         private readonly NaiveBayes NaiveBayes;
         private bool FeatuesEvaluated = false;
@@ -108,13 +108,13 @@
             Console.WriteLine($"False Positive: {Convert.ToDouble(falsePositive) / total * 100d}%");
             Console.WriteLine($"False Negative: {Convert.ToDouble(falseNegative) / total * 100d}%\n\n");
         }
-        public void GetAllFeaturesCategoryCount()
+        public void PrintAllFeaturesCategoryCount()
         {
             Console.WriteLine($"Output category count: {TrainData.OutputData.Distinct().Count()}");
             for (int i = 0; i < TrainData.FeatureData.RowCount; i++)
                 Console.WriteLine($"Feature [{FeatureNames[i]}] category count: {TrainData.FeatureData.GetRow(i).Distinct().Count()}");
         }
-        public void GetFeatureProbabilities()
+        public void PrintFeatureProbabilities()
         {
             if (!FeatuesEvaluated)
             {

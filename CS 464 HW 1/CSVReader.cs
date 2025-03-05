@@ -26,7 +26,6 @@
             }
         }
     }
-
     public class DataMatrix<T>(T[][] data)
     {
         public readonly int RowCount = data.Length;

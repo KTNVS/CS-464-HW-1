@@ -45,6 +45,9 @@
             Console.WriteLine("Files found\n");
             
             SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath, false);
+
+            // 4.1, 4.5, 4.6
+
             objectClassifier.PrintMutualInformation();
             for (int k = objectClassifier.FeatureCount; k >= 1; k--)
             {
