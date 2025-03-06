@@ -44,19 +44,25 @@
             }
             Console.WriteLine("Files found\n");
             
-            SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath, false);
+            SpaceObjectDataManager objectClassifier = new(XTrainPath, YTrainPath, XTestPath, YTestPath);
 
-            // 4.1, 4.5, 4.6
+            Console.WriteLine("\nPart 4.1\n");
+            objectClassifier.Evaluate();
+            objectClassifier.Predict();
 
-            objectClassifier.PrintMutualInformation();
+            Console.WriteLine("\nPart 4.5\n");
             for (int k = objectClassifier.FeatureCount; k >= 1; k--)
             {
-                Console.WriteLine($"Selecting first k = {k} elements with the highest mutual information with the output.");
-                objectClassifier.Evaluate(true, k);
-                objectClassifier.Predict();
                 objectClassifier.ResetEvaluationData();
+                Console.WriteLine($"Selecting first k = {k} elements with the highest mutual information with the output.");
+                objectClassifier.Evaluate(selectKMutuals:k);
+                objectClassifier.Predict();
             }
 
+            Console.WriteLine("\nPart 4.6\n");
+            SpaceObjectDataManager objectClassifierGrouped = new(XTrainPath, YTrainPath, XTestPath, YTestPath, true);
+            objectClassifierGrouped.Evaluate();
+            objectClassifierGrouped.Predict();
         }
     }
 }

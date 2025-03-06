@@ -56,9 +56,8 @@
         {
             NaiveBayes.ResetEstimationData();
             FeatuesEvaluated = false;
-            Console.WriteLine("Evaluation data is reset.\n");
         }
-        public void Evaluate(bool forceCategorical = false, int selectKMutuals = 0) // 0, select all, 1-9 select respectively, 
+        public void Evaluate(bool forceCategorical = true, int selectKMutuals = 0) // 0, select all, 1-9 select respectively, 
         {
             var features = (selectKMutuals >= 1 && selectKMutuals <= FeatureCount - 1)
                 ? FeatureSelection.GetFeatureIndexesOrderedByMutualInformation(TrainData).Take(selectKMutuals).Select(f => f.FeatureIndex)
